@@ -21,6 +21,22 @@ tests/             # Lightweight config/unit checks
 - pkg-config
 - For zero-copy NVIDIA path: Jetson Linux 35.x+ with `nvvidconv`/`nvv4l2h264enc` plugins
 
+### Windows (MSYS2) setup
+
+1. Install [MSYS2](https://www.msys2.org/), open the **MSYS2 UCRT64** shell, and update the environment:
+   ```bash
+   pacman -Syu
+   pacman -S mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja pkgconf
+   pacman -S mingw-w64-ucrt-x86_64-gstreamer \
+            mingw-w64-ucrt-x86_64-gst-plugins-base \
+            mingw-w64-ucrt-x86_64-gst-plugins-good \
+            mingw-w64-ucrt-x86_64-gst-plugins-bad \
+            mingw-w64-ucrt-x86_64-gst-plugins-ugly \
+            mingw-w64-ucrt-x86_64-gst-libav
+   ```
+   `gst-plugins-ugly` provides `x264enc`, which is required for the software pipeline.
+2. Build and run the project inside the same `ucrt64.exe` shell. If you prefer PowerShell/Git Bash, prepend `C:\msys64\ucrt64\bin;C:\msys64\usr\bin` to `PATH` (and keep it there at runtime) so the executables can locate `libgstreamer-1.0-0.dll` and friends.
+
 Use the convenience scripts to download upstream GStreamer sources if you build the framework locally:
 
 ```powershell
@@ -67,6 +83,26 @@ ctest --output-on-failure --test-dir build
    Use `--backend software` on x86 machines without NVDEC and `--no-zero-copy` to fall back to CPU buffers.
 
 Both binaries install metadata probes/buffer exporters automatically. The viewer prints frame IDs, DMA-BUF file descriptors, and caps when `--quiet` is not supplied.
+
+### Local loopback demo (no hardware)
+
+Run both binaries on the same host with synthetic video and software codecs:
+
+```bash
+# Terminal A
+./build/apps/capture_server/capture_server \
+    --use-test-pattern --test-pattern smpte \
+    --host 127.0.0.1 --port 5000 \
+    --width 1920 --height 1080 --fps 30 \
+    --no-nvenc --no-zero-copy
+
+# Terminal B
+./build/apps/viewer_client/viewer_client \
+    --listen 0.0.0.0 --port 5000 \
+    --backend software --no-zero-copy
+```
+
+This setup streams a `videotestsrc` pattern over RTP without needing a physical sensor or NVIDIA hardware. Keep the MSYS2 `ucrt64/bin` folder on your `PATH` while running so the executables can load GStreamer DLLs.
 
 ## Zero-copy path
 
