@@ -1,0 +1,11 @@
+/build/
+/.vs/
+/.vscode/
+CMakeCache.txt
+CMakeFiles/
+*.user
+*.log
+*.swp
+*.swo
+compile_commands.json
+install/
