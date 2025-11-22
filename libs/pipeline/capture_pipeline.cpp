@@ -37,7 +37,6 @@ void append_encoder(std::ostringstream& stream, const CapturePipelineConfig& con
                << " iframeinterval=15 insert-sps-pps=true EnableTwopassCBR=false "
                   "OutputIniCtrl=0";
     } else {
-        stream << " ! videoconvert";
         stream << " ! x264enc tune=zerolatency speed-preset=superfast bitrate=" << config.bitrate / 1000
                << " key-int-max=30 sliced-threads=true bframes=0";
     }
@@ -58,18 +57,25 @@ void append_transport(std::ostringstream& stream, const CapturePipelineConfig& c
 
 std::string build_capture_launch(const CapturePipelineConfig& config) {
     std::ostringstream stream;
+    const char* desired_format = config.use_nvenc ? "NV12" : "I420";
+
     if (config.use_test_pattern) {
         stream << "videotestsrc name=source pattern=" << quote(config.test_pattern)
                << " is-live=true";
+        stream << " ! videoconvert";
     } else {
         stream << "v4l2src name=source device=" << quote(config.device);
         if (config.use_zero_copy) {
             stream << " io-mode=dmabuf";
         }
+        if (!config.use_nvenc) {
+            stream << " ! videoconvert";
+        }
     }
-    stream << " ! queue max-size-buffers=" << config.queue_size << " leaky=downstream";
-    stream << " ! video/x-raw,format=NV12,width=" << config.width << ",height=" << config.height
+    stream << " ! video/x-raw,format=" << desired_format << ",width=" << config.width
+           << ",height=" << config.height
            << ",framerate=" << config.framerate << "/1";
+    stream << " ! queue max-size-buffers=" << config.queue_size << " leaky=downstream";
 
     append_encoder(stream, config);
     append_transport(stream, config);
@@ -78,6 +84,7 @@ std::string build_capture_launch(const CapturePipelineConfig& config) {
 
 GstElement* make_capture_pipeline(const CapturePipelineConfig& config, GError** error) {
     const auto description = build_capture_launch(config);
+    g_print("Pipeline description: %s\n", description.c_str());
     GError* local_error = nullptr;
     GstElement* pipeline = gst_parse_launch(description.c_str(), &local_error);
     if (!pipeline) {
